@@ -7,3 +7,4 @@ pwdlib[argon2]
 email-validator
 google-genai
 scikit-learn
+argon2-cffi
