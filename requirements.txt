@@ -3,7 +3,7 @@ uvicorn
 sqlalchemy
 pymysql
 python-dotenv
-pwdlib
+pwdlib[argon2]
 email-validator
 google-genai
 scikit-learn
