@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+python-dotenv
+pwdlib
+email-validator
+google-genai
+scikit-learn
