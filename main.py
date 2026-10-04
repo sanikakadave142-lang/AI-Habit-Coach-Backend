@@ -1,5 +1,6 @@
 import os
 import secrets
+import time
 from datetime import date
 from typing import List
 
@@ -41,7 +42,9 @@ from google import genai
 # ============================================================
 
 from database import Base, engine, get_db
+
 from model import User, Habit, HabitLog
+
 from schemas import (
     RegisterRequest,
     LoginRequest,
@@ -99,12 +102,21 @@ password_hash = PasswordHash.recommended()
 gemini_client = None
 
 if GEMINI_API_KEY:
+
     try:
+
         gemini_client = genai.Client(
             api_key=GEMINI_API_KEY
         )
+
+        print("Gemini client initialized successfully.")
+
     except Exception as e:
-        print("Gemini initialization error:", e)
+
+        print(
+            "Gemini initialization error:",
+            e
+        )
 
 
 # ============================================================
@@ -120,6 +132,7 @@ ADMIN_TOKENS = set()
 
 @app.get("/")
 def root():
+
     return {
         "success": True,
         "message": "AI Habit Coach Backend is Running",
@@ -139,11 +152,14 @@ def register(
 
     existing_user = (
         db.query(User)
-        .filter(User.email == data.email)
+        .filter(
+            User.email == data.email
+        )
         .first()
     )
 
     if existing_user:
+
         raise HTTPException(
             status_code=400,
             detail="Email already registered"
@@ -160,7 +176,9 @@ def register(
     )
 
     db.add(user)
+
     db.commit()
+
     db.refresh(user)
 
     return {
@@ -186,25 +204,32 @@ def login(
 
     user = (
         db.query(User)
-        .filter(User.email == data.email)
+        .filter(
+            User.email == data.email
+        )
         .first()
     )
 
     if not user:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
     try:
+
         valid_password = password_hash.verify(
             data.password,
             user.password
         )
+
     except Exception:
+
         valid_password = False
 
     if not valid_password:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
@@ -225,7 +250,10 @@ def login(
 # CREATE HABIT
 # ============================================================
 
-@app.post("/habits", response_model=HabitResponse)
+@app.post(
+    "/habits",
+    response_model=HabitResponse
+)
 def create_habit(
     data: HabitCreate,
     user_id: int,
@@ -234,11 +262,14 @@ def create_habit(
 
     user = (
         db.query(User)
-        .filter(User.id == user_id)
+        .filter(
+            User.id == user_id
+        )
         .first()
     )
 
     if not user:
+
         raise HTTPException(
             status_code=404,
             detail="User not found"
@@ -253,7 +284,9 @@ def create_habit(
     )
 
     db.add(habit)
+
     db.commit()
+
     db.refresh(habit)
 
     return habit
@@ -263,7 +296,10 @@ def create_habit(
 # GET ALL HABITS OF USER
 # ============================================================
 
-@app.get("/habits", response_model=List[HabitResponse])
+@app.get(
+    "/habits",
+    response_model=List[HabitResponse]
+)
 def get_habits(
     user_id: int,
     db: Session = Depends(get_db)
@@ -271,7 +307,9 @@ def get_habits(
 
     habits = (
         db.query(Habit)
-        .filter(Habit.user_id == user_id)
+        .filter(
+            Habit.user_id == user_id
+        )
         .all()
     )
 
@@ -282,7 +320,10 @@ def get_habits(
 # GET SINGLE HABIT
 # ============================================================
 
-@app.get("/habits/{habit_id}", response_model=HabitResponse)
+@app.get(
+    "/habits/{habit_id}",
+    response_model=HabitResponse
+)
 def get_habit(
     habit_id: int,
     user_id: int,
@@ -299,6 +340,7 @@ def get_habit(
     )
 
     if not habit:
+
         raise HTTPException(
             status_code=404,
             detail="Habit not found"
@@ -311,7 +353,10 @@ def get_habit(
 # UPDATE HABIT
 # ============================================================
 
-@app.put("/habits/{habit_id}", response_model=HabitResponse)
+@app.put(
+    "/habits/{habit_id}",
+    response_model=HabitResponse
+)
 def update_habit(
     habit_id: int,
     data: HabitUpdate,
@@ -329,6 +374,7 @@ def update_habit(
     )
 
     if not habit:
+
         raise HTTPException(
             status_code=404,
             detail="Habit not found"
@@ -347,6 +393,7 @@ def update_habit(
         habit.status = data.status
 
     db.commit()
+
     db.refresh(habit)
 
     return habit
@@ -373,12 +420,14 @@ def delete_habit(
     )
 
     if not habit:
+
         raise HTTPException(
             status_code=404,
             detail="Habit not found"
         )
 
     db.delete(habit)
+
     db.commit()
 
     return {
@@ -391,7 +440,10 @@ def delete_habit(
 # CREATE HABIT LOG
 # ============================================================
 
-@app.post("/habit-log", response_model=HabitLogResponse)
+@app.post(
+    "/habit-log",
+    response_model=HabitLogResponse
+)
 def create_habit_log(
     data: HabitLogCreate,
     user_id: int,
@@ -408,6 +460,7 @@ def create_habit_log(
     )
 
     if not habit:
+
         raise HTTPException(
             status_code=404,
             detail="Habit not found"
@@ -428,6 +481,7 @@ def create_habit_log(
     habit.status = data.status
 
     db.commit()
+
     db.refresh(log)
 
     return log
@@ -437,7 +491,10 @@ def create_habit_log(
 # GET HABIT LOGS
 # ============================================================
 
-@app.get("/habit-log", response_model=List[HabitLogResponse])
+@app.get(
+    "/habit-log",
+    response_model=List[HabitLogResponse]
+)
 def get_habit_logs(
     user_id: int,
     db: Session = Depends(get_db)
@@ -445,8 +502,12 @@ def get_habit_logs(
 
     logs = (
         db.query(HabitLog)
-        .filter(HabitLog.user_id == user_id)
-        .order_by(HabitLog.log_date.desc())
+        .filter(
+            HabitLog.user_id == user_id
+        )
+        .order_by(
+            HabitLog.log_date.desc()
+        )
         .all()
     )
 
@@ -465,7 +526,9 @@ def get_progress(
 
     logs = (
         db.query(HabitLog)
-        .filter(HabitLog.user_id == user_id)
+        .filter(
+            HabitLog.user_id == user_id
+        )
         .all()
     )
 
@@ -474,22 +537,31 @@ def get_progress(
     completed = sum(
         1
         for log in logs
-        if log.status.lower() == "completed"
+        if log.status
+        and log.status.lower() == "completed"
     )
 
     missed = sum(
         1
         for log in logs
-        if log.status.lower() == "missed"
+        if log.status
+        and log.status.lower() == "missed"
     )
 
-    pending = total_logs - completed - missed
+    pending = (
+        total_logs
+        - completed
+        - missed
+    )
 
     if total_logs > 0:
+
         completion_percentage = (
             completed / total_logs
         ) * 100
+
     else:
+
         completion_percentage = 0
 
     return {
@@ -511,8 +583,27 @@ def get_progress(
 # ============================================================
 
 class AIAdviceRequest(BaseModel):
+
     question: str
+
     user_id: int | None = None
+
+
+# ============================================================
+# GEMINI MODELS
+# ============================================================
+
+AI_MODELS = [
+
+    "gemini-3.8-flash",
+
+    "gemini-3.7-flash",
+
+    "gemini-3.6-flash",
+
+    "gemini-3.5-flash"
+
+]
 
 
 # ============================================================
@@ -524,11 +615,43 @@ def ai_advice(
     data: AIAdviceRequest
 ):
 
+    # --------------------------------------------------------
+    # CHECK GEMINI
+    # --------------------------------------------------------
+
     if not gemini_client:
+
         raise HTTPException(
             status_code=500,
             detail="Gemini API is not configured"
         )
+
+
+    # --------------------------------------------------------
+    # CHECK QUESTION
+    # --------------------------------------------------------
+
+    if not data.question:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Question is required"
+        )
+
+
+    question = data.question.strip()
+
+    if not question:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty"
+        )
+
+
+    # --------------------------------------------------------
+    # PROMPT
+    # --------------------------------------------------------
 
     prompt = f"""
 You are an AI Habit Coach.
@@ -537,37 +660,130 @@ Give simple, practical and motivating advice
 to help a user build and maintain good habits.
 
 User question:
-{data.question}
+{question}
 
 Rules:
 - Keep the answer easy to understand.
 - Give practical steps.
 - Be positive and supportive.
 - Avoid medical diagnosis.
+- Keep the answer concise.
+- Use simple language.
 """
 
-    try:
 
-        response = gemini_client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt
+    last_error = None
+
+
+    # ========================================================
+    # TRY MODELS
+    # ========================================================
+
+    for model_name in AI_MODELS:
+
+        for attempt in range(2):
+
+            try:
+
+                print(
+                    "Trying Gemini model:",
+                    model_name,
+                    "Attempt:",
+                    attempt + 1
+                )
+
+
+                response = (
+                    gemini_client
+                    .models
+                    .generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                )
+
+
+                advice = getattr(
+                    response,
+                    "text",
+                    None
+                )
+
+
+                if advice and advice.strip():
+
+                    print(
+                        "Gemini success:",
+                        model_name
+                    )
+
+                    return {
+                        "success": True,
+                        "question": question,
+                        "advice": advice.strip(),
+                        "user_id": data.user_id,
+                        "model": model_name
+                    }
+
+
+                last_error = (
+                    f"{model_name} returned "
+                    "an empty response"
+                )
+
+
+            except Exception as e:
+
+                last_error = str(e)
+
+                print(
+                    "Gemini error:",
+                    model_name,
+                    str(e)
+                )
+
+
+                error_text = (
+                    str(e).lower()
+                )
+
+
+                # ------------------------------------------------
+                # TEMPORARY 503 / HIGH DEMAND
+                # ------------------------------------------------
+
+                if (
+                    "503" in error_text
+                    or "unavailable" in error_text
+                    or "high demand" in error_text
+                    or "overloaded" in error_text
+                ):
+
+                    if attempt == 0:
+
+                        time.sleep(2)
+
+                        continue
+
+
+                # Other errors:
+                # move to next model
+
+                break
+
+
+    # ========================================================
+    # ALL MODELS FAILED
+    # ========================================================
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "AI service is temporarily unavailable. "
+            "Please try again after a few seconds. "
+            f"Last error: {last_error}"
         )
-
-        advice = response.text
-
-        return {
-            "success": True,
-            "question": data.question,
-            "advice": advice,
-            "user_id": data.user_id
-        }
-
-    except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"AI error: {str(e)}"
-        )
+    )
 
 
 # ============================================================
@@ -575,7 +791,9 @@ Rules:
 # ============================================================
 
 class AdminLoginRequest(BaseModel):
+
     email: str
+
     password: str
 
 
@@ -584,16 +802,20 @@ class AdminLoginRequest(BaseModel):
 # ============================================================
 
 def check_admin_token(
-    x_admin_token: str | None = Header(default=None)
+    x_admin_token: str | None = Header(
+        default=None
+    )
 ):
 
     if not x_admin_token:
+
         raise HTTPException(
             status_code=401,
             detail="Admin token required"
         )
 
     if x_admin_token not in ADMIN_TOKENS:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired admin token"
@@ -611,16 +833,24 @@ def admin_login(
     data: AdminLoginRequest
 ):
 
-    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+    if (
+        not ADMIN_EMAIL
+        or not ADMIN_PASSWORD
+    ):
+
         raise HTTPException(
             status_code=500,
-            detail="Admin credentials are not configured in .env"
+            detail=(
+                "Admin credentials are "
+                "not configured in .env"
+            )
         )
 
     if (
         data.email != ADMIN_EMAIL
         or data.password != ADMIN_PASSWORD
     ):
+
         raise HTTPException(
             status_code=401,
             detail="Invalid admin email or password"
@@ -643,10 +873,13 @@ def admin_login(
 
 @app.post("/admin/logout")
 def admin_logout(
-    x_admin_token: str | None = Header(default=None)
+    x_admin_token: str | None = Header(
+        default=None
+    )
 ):
 
     if x_admin_token:
+
         ADMIN_TOKENS.discard(
             x_admin_token
         )
@@ -668,52 +901,84 @@ def admin_stats(
 ):
 
     users = db.query(User).all()
+
     habits = db.query(Habit).all()
+
     logs = db.query(HabitLog).all()
+
 
     completed_habits = sum(
         1
         for habit in habits
-        if habit.status.lower() == "completed"
+        if habit.status
+        and habit.status.lower()
+        == "completed"
     )
+
 
     pending_habits = sum(
         1
         for habit in habits
-        if habit.status.lower() == "pending"
+        if habit.status
+        and habit.status.lower()
+        == "pending"
     )
+
 
     completed_logs = sum(
         1
         for log in logs
-        if log.status.lower() == "completed"
+        if log.status
+        and log.status.lower()
+        == "completed"
     )
+
 
     missed_logs = sum(
         1
         for log in logs
-        if log.status.lower() == "missed"
+        if log.status
+        and log.status.lower()
+        == "missed"
     )
 
+
     completion_percentage = (
-        completed_logs / len(logs) * 100
+        completed_logs
+        / len(logs)
+        * 100
         if logs
         else 0
     )
 
+
     return {
+
         "success": True,
+
         "total_users": len(users),
+
         "total_habits": len(habits),
-        "completed_habits": completed_habits,
-        "pending_habits": pending_habits,
+
+        "completed_habits":
+            completed_habits,
+
+        "pending_habits":
+            pending_habits,
+
         "total_logs": len(logs),
-        "completed_logs": completed_logs,
-        "missed_logs": missed_logs,
-        "completion_percentage": round(
-            completion_percentage,
-            2
-        )
+
+        "completed_logs":
+            completed_logs,
+
+        "missed_logs":
+            missed_logs,
+
+        "completion_percentage":
+            round(
+                completion_percentage,
+                2
+            )
     }
 
 
@@ -729,122 +994,203 @@ def admin_users(
 
     users = (
         db.query(User)
-        .order_by(User.id.desc())
+        .order_by(
+            User.id.desc()
+        )
         .all()
     )
 
+
     result = []
+
 
     for user in users:
 
         habits = (
             db.query(Habit)
-            .filter(Habit.user_id == user.id)
+            .filter(
+                Habit.user_id == user.id
+            )
             .all()
         )
 
+
         logs = (
             db.query(HabitLog)
-            .filter(HabitLog.user_id == user.id)
+            .filter(
+                HabitLog.user_id == user.id
+            )
             .all()
         )
+
 
         completed_habits = sum(
             1
             for habit in habits
-            if habit.status.lower() == "completed"
+            if habit.status
+            and habit.status.lower()
+            == "completed"
         )
+
 
         pending_habits = sum(
             1
             for habit in habits
-            if habit.status.lower() == "pending"
+            if habit.status
+            and habit.status.lower()
+            == "pending"
         )
+
 
         completed_logs = sum(
             1
             for log in logs
-            if log.status.lower() == "completed"
+            if log.status
+            and log.status.lower()
+            == "completed"
         )
+
 
         missed_logs = sum(
             1
             for log in logs
-            if log.status.lower() == "missed"
+            if log.status
+            and log.status.lower()
+            == "missed"
         )
 
+
         completion_percentage = (
-            completed_logs / len(logs) * 100
+
+            completed_logs
+            / len(logs)
+            * 100
+
             if logs
+
             else 0
         )
 
+
         habit_data = []
+
 
         for habit in habits:
 
             habit_data.append({
+
                 "id": habit.id,
+
                 "name": habit.name,
-                "category": habit.category,
-                "target": habit.target,
-                "status": habit.status
+
+                "category":
+                    habit.category,
+
+                "target":
+                    habit.target,
+
+                "status":
+                    habit.status
             })
 
+
         log_data = []
+
 
         for log in logs:
 
             habit = (
                 db.query(Habit)
-                .filter(Habit.id == log.habit_id)
+                .filter(
+                    Habit.id
+                    == log.habit_id
+                )
                 .first()
             )
 
+
             log_data.append({
+
                 "id": log.id,
-                "habit_id": log.habit_id,
+
+                "habit_id":
+                    log.habit_id,
+
                 "habit_name": (
                     habit.name
                     if habit
                     else "Unknown"
                 ),
+
                 "log_date": (
                     str(log.log_date)
                     if log.log_date
                     else None
                 ),
-                "status": log.status,
-                "duration": log.duration,
-                "note": log.note
+
+                "status":
+                    log.status,
+
+                "duration":
+                    log.duration,
+
+                "note":
+                    log.note
             })
 
+
         result.append({
-            "user_id": user.id,
-            "name": user.name,
-            "email": user.email,
 
-            "total_habits": len(habits),
-            "completed_habits": completed_habits,
-            "pending_habits": pending_habits,
+            "user_id":
+                user.id,
 
-            "total_logs": len(logs),
-            "completed_logs": completed_logs,
-            "missed_logs": missed_logs,
+            "name":
+                user.name,
 
-            "completion_percentage": round(
-                completion_percentage,
-                2
-            ),
+            "email":
+                user.email,
 
-            "habits": habit_data,
-            "logs": log_data
+            "total_habits":
+                len(habits),
+
+            "completed_habits":
+                completed_habits,
+
+            "pending_habits":
+                pending_habits,
+
+            "total_logs":
+                len(logs),
+
+            "completed_logs":
+                completed_logs,
+
+            "missed_logs":
+                missed_logs,
+
+            "completion_percentage":
+                round(
+                    completion_percentage,
+                    2
+                ),
+
+            "habits":
+                habit_data,
+
+            "logs":
+                log_data
         })
 
+
     return {
+
         "success": True,
-        "total_users": len(result),
-        "users": result
+
+        "total_users":
+            len(result),
+
+        "users":
+            result
     }
 
 
@@ -852,7 +1198,9 @@ def admin_users(
 # ADMIN - SINGLE USER DETAILS
 # ============================================================
 
-@app.get("/admin/users/{user_id}")
+@app.get(
+    "/admin/users/{user_id}"
+)
 def admin_user_details(
     user_id: int,
     _: bool = Depends(check_admin_token),
@@ -861,57 +1209,105 @@ def admin_user_details(
 
     user = (
         db.query(User)
-        .filter(User.id == user_id)
+        .filter(
+            User.id == user_id
+        )
         .first()
     )
 
+
     if not user:
+
         raise HTTPException(
             status_code=404,
             detail="User not found"
         )
 
+
     habits = (
         db.query(Habit)
-        .filter(Habit.user_id == user_id)
+        .filter(
+            Habit.user_id == user_id
+        )
         .all()
     )
+
 
     logs = (
         db.query(HabitLog)
-        .filter(HabitLog.user_id == user_id)
+        .filter(
+            HabitLog.user_id == user_id
+        )
         .all()
     )
 
+
     return {
+
         "success": True,
 
         "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email
+
+            "id":
+                user.id,
+
+            "name":
+                user.name,
+
+            "email":
+                user.email
         },
 
+
         "habits": [
+
             {
-                "id": habit.id,
-                "name": habit.name,
-                "category": habit.category,
-                "target": habit.target,
-                "status": habit.status
+
+                "id":
+                    habit.id,
+
+                "name":
+                    habit.name,
+
+                "category":
+                    habit.category,
+
+                "target":
+                    habit.target,
+
+                "status":
+                    habit.status
+
             }
+
             for habit in habits
         ],
 
+
         "logs": [
+
             {
-                "id": log.id,
-                "habit_id": log.habit_id,
-                "log_date": str(log.log_date),
-                "status": log.status,
-                "duration": log.duration,
-                "note": log.note
+
+                "id":
+                    log.id,
+
+                "habit_id":
+                    log.habit_id,
+
+                "log_date":
+                    str(log.log_date),
+
+                "status":
+                    log.status,
+
+                "duration":
+                    log.duration,
+
+                "note":
+                    log.note
+
             }
+
             for log in logs
         ]
     }
@@ -921,20 +1317,38 @@ def admin_user_details(
 # SERVER START MESSAGE
 # ============================================================
 
-print("==========================================")
-print(" AI HABIT COACH BACKEND")
-print("==========================================")
-print("Environment file:", ENV_PATH)
+print(
+    "=========================================="
+)
+
+print(
+    " AI HABIT COACH BACKEND"
+)
+
+print(
+    "=========================================="
+)
+
+print(
+    "Environment file:",
+    ENV_PATH
+)
+
 print(
     "Admin email loaded:",
     bool(ADMIN_EMAIL)
 )
+
 print(
     "Admin password loaded:",
     bool(ADMIN_PASSWORD)
 )
+
 print(
     "Gemini API loaded:",
     bool(GEMINI_API_KEY)
 )
-print("==========================================")
+
+print(
+    "=========================================="
+)
