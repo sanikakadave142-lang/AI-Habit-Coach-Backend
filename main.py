@@ -2,7 +2,6 @@ import os
 import secrets
 import time
 from datetime import date
-from typing import List
 
 from dotenv import load_dotenv
 
@@ -20,7 +19,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 # FASTAPI
 # =========================
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 
 # =========================
@@ -61,7 +60,6 @@ if GEMINI_API_KEY:
 else:
     print("Gemini API loaded: False")
 
-
 # =========================
 # APP
 # =========================
@@ -83,7 +81,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # =========================
 # DATABASE DEPENDENCY
 # =========================
@@ -95,7 +92,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
 
 # =========================
 # PASSWORD FUNCTIONS
@@ -111,13 +107,11 @@ def verify_password(password: str, hashed_password: str):
     except Exception:
         return False
 
-
 # =========================
 # ADMIN TOKEN
 # =========================
 
 ADMIN_TOKENS = set()
-
 
 # =========================
 # ROOT
@@ -130,7 +124,6 @@ def root():
         "message": "AI Habit Coach Backend is Running",
         "version": "1.0.0"
     }
-
 
 # ============================================================
 # REGISTER
@@ -173,7 +166,6 @@ def register(
         }
     }
 
-
 # ============================================================
 # LOGIN
 # ============================================================
@@ -214,7 +206,6 @@ def login(
         }
     }
 
-
 # ============================================================
 # ADD HABIT
 # ============================================================
@@ -249,7 +240,6 @@ def add_habit(
         }
     }
 
-
 # ============================================================
 # GET HABITS
 # ============================================================
@@ -279,7 +269,6 @@ def get_habits(
             for habit in habits
         ]
     }
-
 
 # ============================================================
 # UPDATE HABIT
@@ -331,7 +320,6 @@ def update_habit(
         }
     }
 
-
 # ============================================================
 # DELETE HABIT
 # ============================================================
@@ -360,7 +348,6 @@ def delete_habit(
         "success": True,
         "message": "Habit deleted successfully"
     }
-
 
 # ============================================================
 # HABIT LOG
@@ -396,7 +383,6 @@ def add_habit_log(
         }
     }
 
-
 # ============================================================
 # GET HABIT LOG
 # ============================================================
@@ -427,7 +413,6 @@ def get_habit_logs(
         ]
     }
 
-
 # ============================================================
 # PROGRESS
 # ============================================================
@@ -446,12 +431,14 @@ def get_progress(
     total_logs = len(logs)
 
     completed = sum(
-        1 for log in logs
+        1
+        for log in logs
         if str(log.status).lower() == "completed"
     )
 
     missed = sum(
-        1 for log in logs
+        1
+        for log in logs
         if str(log.status).lower() == "missed"
     )
 
@@ -470,7 +457,6 @@ def get_progress(
         "completion_percentage": completion_percentage,
         "missed": missed
     }
-
 
 # ============================================================
 # AI FALLBACK
@@ -531,7 +517,6 @@ def get_fallback_advice(question: str):
         "If you miss one day, do not give up. Start again the next day."
     )
 
-
 # ============================================================
 # AI ADVICE REQUEST
 # ============================================================
@@ -539,7 +524,6 @@ def get_fallback_advice(question: str):
 class AIAdviceRequest(schemas.BaseModel):
     question: str
     user_id: int | None = None
-
 
 # ============================================================
 # GEMINI MODELS
@@ -551,7 +535,6 @@ AI_MODELS = [
     "gemini-3.6-flash",
     "gemini-3.5-flash"
 ]
-
 
 # ============================================================
 # AI ADVICE
@@ -569,10 +552,6 @@ def ai_advice(request: AIAdviceRequest):
         )
 
     fallback = get_fallback_advice(question)
-
-    # --------------------------------------------------------
-    # Gemini not configured
-    # --------------------------------------------------------
 
     if gemini_client is None:
         return {
@@ -598,10 +577,6 @@ Rules:
 - Give actionable suggestions.
 - Do not give dangerous medical advice.
 """
-
-    # --------------------------------------------------------
-    # Try Gemini
-    # --------------------------------------------------------
 
     for model_name in AI_MODELS:
 
@@ -632,10 +607,6 @@ Rules:
                 str(e)
             )
 
-            # ------------------------------------------------
-            # QUOTA / 429
-            # ------------------------------------------------
-
             if (
                 "429" in error_text
                 or "quota" in error_text
@@ -648,10 +619,6 @@ Rules:
                 )
                 break
 
-            # ------------------------------------------------
-            # SERVER BUSY / 503
-            # ------------------------------------------------
-
             if (
                 "503" in error_text
                 or "unavailable" in error_text
@@ -661,15 +628,7 @@ Rules:
                 time.sleep(1)
                 continue
 
-            # ------------------------------------------------
-            # OTHER GEMINI ERROR
-            # ------------------------------------------------
-
             continue
-
-    # --------------------------------------------------------
-    # ALWAYS RETURN FALLBACK
-    # --------------------------------------------------------
 
     return {
         "success": True,
@@ -679,7 +638,6 @@ Rules:
         "model": "fallback",
         "source": "Habit Coach"
     }
-
 
 # ============================================================
 # AI PREDICTION
@@ -704,26 +662,30 @@ def ai_predict(data: dict):
         data.get("frequency", 7)
     )
 
-    # Simple rule-based prediction
-
     if completion_rate >= 80 and current_streak >= 5:
+
         prediction = "Likely to Complete"
         confidence = 100.0
+
         recommendation = (
             "Keep following your current habit routine."
         )
 
     elif completion_rate >= 60:
+
         prediction = "Moderately Likely to Complete"
         confidence = 80.0
+
         recommendation = (
             "Try to maintain a regular routine "
             "and reduce missed days."
         )
 
     else:
+
         prediction = "Needs Improvement"
         confidence = 70.0
+
         recommendation = (
             "Start with a smaller goal and focus "
             "on completing the habit consistently."
@@ -740,7 +702,6 @@ def ai_predict(data: dict):
         "frequency": frequency
     }
 
-
 # ============================================================
 # ADMIN LOGIN
 # ============================================================
@@ -752,12 +713,14 @@ def admin_login(data: dict):
     password = data.get("password")
 
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+
         raise HTTPException(
             status_code=500,
             detail="Admin credentials are not configured"
         )
 
     if email != ADMIN_EMAIL or password != ADMIN_PASSWORD:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid admin credentials"
@@ -773,7 +736,6 @@ def admin_login(data: dict):
         "token": token
     }
 
-
 # ============================================================
 # ADMIN AUTH
 # ============================================================
@@ -781,19 +743,20 @@ def admin_login(data: dict):
 def verify_admin_token(token: str):
 
     if not token:
+
         raise HTTPException(
             status_code=401,
             detail="Admin token required"
         )
 
     if token not in ADMIN_TOKENS:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired admin token"
         )
 
     return True
-
 
 # ============================================================
 # ADMIN LOGOUT
@@ -812,21 +775,22 @@ def admin_logout(data: dict):
         "message": "Admin logout successful"
     }
 
-
 # ============================================================
 # ADMIN STATS
 # ============================================================
 
 @app.get("/admin/stats")
 def admin_stats(
-    token: str,
+    token: str = Header(None, alias="X-Admin-Token"),
     db: Session = Depends(get_db)
 ):
 
     verify_admin_token(token)
 
     users_count = db.query(model.User).count()
+
     habits_count = db.query(model.Habit).count()
+
     logs_count = db.query(model.HabitLog).count()
 
     completed_count = (
@@ -845,14 +809,13 @@ def admin_stats(
         "completed": completed_count
     }
 
-
 # ============================================================
 # ADMIN USERS
 # ============================================================
 
 @app.get("/admin/users")
 def admin_users(
-    token: str,
+    token: str = Header(None, alias="X-Admin-Token"),
     db: Session = Depends(get_db)
 ):
 
@@ -872,7 +835,6 @@ def admin_users(
         ]
     }
 
-
 # ============================================================
 # ADMIN USER DETAILS
 # ============================================================
@@ -880,7 +842,7 @@ def admin_users(
 @app.get("/admin/users/{user_id}")
 def admin_user_details(
     user_id: int,
-    token: str,
+    token: str = Header(None, alias="X-Admin-Token"),
     db: Session = Depends(get_db)
 ):
 
@@ -893,6 +855,7 @@ def admin_user_details(
     )
 
     if not user:
+
         raise HTTPException(
             status_code=404,
             detail="User not found"
@@ -938,7 +901,6 @@ def admin_user_details(
             for l in logs
         ]
     }
-
 
 # ============================================================
 # SERVER START
