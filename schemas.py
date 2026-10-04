@@ -81,3 +81,4 @@ class HabitLogResponse(BaseModel):
     duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
+# FastAPI schemas updated
