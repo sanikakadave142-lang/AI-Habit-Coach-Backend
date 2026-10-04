@@ -4,29 +4,30 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 
-class RegisterRequest(BaseModel):
+# ============================================================
+# USER SCHEMAS
+# ============================================================
+
+class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
 
 
-class LoginRequest(BaseModel):
+class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
 
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: EmailStr
-
-    model_config = ConfigDict(from_attributes=True)
-
+# ============================================================
+# HABIT SCHEMAS
+# ============================================================
 
 class HabitCreate(BaseModel):
     name: str
-    category: Optional[str] = None
-    target: Optional[str] = None
+    category: str
+    target: str
+    user_id: int
 
 
 class HabitUpdate(BaseModel):
@@ -36,32 +37,47 @@ class HabitUpdate(BaseModel):
     status: Optional[str] = None
 
 
+# ============================================================
+# HABIT LOG SCHEMAS
+# ============================================================
+
+class HabitLogCreate(BaseModel):
+    user_id: int
+    habit_id: int
+    date: date
+    status: str
+    duration: Optional[int] = 0
+
+
+# ============================================================
+# DATABASE RESPONSE SUPPORT
+# ============================================================
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class HabitResponse(BaseModel):
     id: int
     name: str
-    category: Optional[str]
-    target: Optional[str]
+    category: str
+    target: str
     status: str
     user_id: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class HabitLogCreate(BaseModel):
-    habit_id: int
-    log_date: Optional[date] = None
-    status: str = "Completed"
-    duration: Optional[int] = None
-    note: Optional[str] = None
-
-
 class HabitLogResponse(BaseModel):
     id: int
-    habit_id: int
     user_id: int
-    log_date: date
+    habit_id: int
+    date: date
     status: str
-    duration: Optional[int]
-    note: Optional[str]
+    duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
