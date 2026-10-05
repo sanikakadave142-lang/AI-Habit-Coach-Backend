@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 # ============================================================
-# USER SCHEMAS
+# USER
 # ============================================================
 
 class UserCreate(BaseModel):
@@ -19,8 +19,16 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============================================================
-# HABIT SCHEMAS
+# HABIT
 # ============================================================
 
 class HabitCreate(BaseModel):
@@ -37,30 +45,6 @@ class HabitUpdate(BaseModel):
     status: Optional[str] = None
 
 
-# ============================================================
-# HABIT LOG SCHEMAS
-# ============================================================
-
-class HabitLogCreate(BaseModel):
-    user_id: int
-    habit_id: int
-    date: date
-    status: str
-    duration: Optional[int] = 0
-
-
-# ============================================================
-# DATABASE RESPONSE SUPPORT
-# ============================================================
-
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: EmailStr
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class HabitResponse(BaseModel):
     id: int
     name: str
@@ -72,6 +56,18 @@ class HabitResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ============================================================
+# HABIT LOG
+# ============================================================
+
+class HabitLogCreate(BaseModel):
+    user_id: int
+    habit_id: int
+    date: date
+    status: str
+    duration: Optional[int] = 0
+
+
 class HabitLogResponse(BaseModel):
     id: int
     user_id: int
@@ -81,4 +77,3 @@ class HabitLogResponse(BaseModel):
     duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
-# FastAPI schemas updated
