@@ -1513,32 +1513,62 @@ def admin_users(
     db: Session = Depends(get_db)
 ):
 
+    # Check admin login
     verify_admin_token(token)
 
+    # Get all users
     users = (
         db.query(model.User)
         .all()
     )
 
+    result = []
+
+    # Get habits for every user
+    for user in users:
+
+        habits = (
+            db.query(model.Habit)
+            .filter(
+                model.Habit.user_id == user.id
+            )
+            .all()
+        )
+
+        result.append({
+
+            "id": user.id,
+
+            "name": user.name,
+
+            "email": user.email,
+
+            "habits": [
+
+                {
+                    "id": habit.id,
+
+                    "name": habit.name,
+
+                    "category": habit.category,
+
+                    "target": habit.target,
+
+                    "status": habit.status,
+
+                    "user_id": habit.user_id
+                }
+
+                for habit in habits
+            ]
+        })
+
     return {
 
         "success": True,
 
-        "users": [
-
-            {
-
-                "id": user.id,
-
-                "name": user.name,
-
-                "email": user.email
-            }
-
-            for user in users
-        ]
+        "users": result
     }
-
 
 # ============================================================
 # ADMIN USER DETAILS
