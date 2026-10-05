@@ -1,3 +1,4 @@
+
 import os
 import secrets
 import time
@@ -37,6 +38,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 from database import SessionLocal, engine
 import model
@@ -44,10 +46,204 @@ import schemas
 
 
 # ============================================================
+# DATABASE MIGRATION
+# ============================================================
+
+def migrate_database():
+
+    try:
+
+        print("Checking database migration...")
+
+        with engine.begin() as conn:
+
+            # ------------------------------------------------
+            # Check whether habit_logs table exists
+            # ------------------------------------------------
+
+            table_result = conn.execute(
+                text("SHOW TABLES LIKE 'habit_logs'")
+            )
+
+            table_exists = table_result.fetchone()
+
+            # ------------------------------------------------
+            # If table does not exist, create tables first
+            # ------------------------------------------------
+
+            if not table_exists:
+
+                print(
+                    "habit_logs table not found. "
+                    "Creating database tables..."
+                )
+
+                model.Base.metadata.create_all(
+                    bind=engine
+                )
+
+            else:
+
+                # --------------------------------------------
+                # Get existing columns
+                # --------------------------------------------
+
+                result = conn.execute(
+                    text("SHOW COLUMNS FROM habit_logs")
+                )
+
+                columns = {
+                    row[0]
+                    for row in result.fetchall()
+                }
+
+                print(
+                    "Existing habit_logs columns:",
+                    columns
+                )
+
+                # --------------------------------------------
+                # Add user_id if missing
+                # --------------------------------------------
+
+                if "user_id" not in columns:
+
+                    print(
+                        "Adding missing column: user_id"
+                    )
+
+                    conn.execute(
+                        text(
+                            """
+                            ALTER TABLE habit_logs
+                            ADD COLUMN user_id INT NOT NULL DEFAULT 1
+                            """
+                        )
+                    )
+
+                # --------------------------------------------
+                # Add habit_id if missing
+                # --------------------------------------------
+
+                if "habit_id" not in columns:
+
+                    print(
+                        "Adding missing column: habit_id"
+                    )
+
+                    conn.execute(
+                        text(
+                            """
+                            ALTER TABLE habit_logs
+                            ADD COLUMN habit_id INT NOT NULL DEFAULT 1
+                            """
+                        )
+                    )
+
+                # --------------------------------------------
+                # Add date if missing
+                # --------------------------------------------
+
+                if "date" not in columns:
+
+                    print(
+                        "Adding missing column: date"
+                    )
+
+                    conn.execute(
+                        text(
+                            """
+                            ALTER TABLE habit_logs
+                            ADD COLUMN date DATE NOT NULL
+                            DEFAULT '2026-01-01'
+                            """
+                        )
+                    )
+
+                # --------------------------------------------
+                # Add status if missing
+                # --------------------------------------------
+
+                if "status" not in columns:
+
+                    print(
+                        "Adding missing column: status"
+                    )
+
+                    conn.execute(
+                        text(
+                            """
+                            ALTER TABLE habit_logs
+                            ADD COLUMN status VARCHAR(50)
+                            NOT NULL DEFAULT 'Pending'
+                            """
+                        )
+                    )
+
+                # --------------------------------------------
+                # Add duration if missing
+                # --------------------------------------------
+
+                if "duration" not in columns:
+
+                    print(
+                        "Adding missing column: duration"
+                    )
+
+                    conn.execute(
+                        text(
+                            """
+                            ALTER TABLE habit_logs
+                            ADD COLUMN duration INT
+                            DEFAULT 0
+                            """
+                        )
+                    )
+
+        print(
+            "DATABASE MIGRATION COMPLETED"
+        )
+
+    except Exception as e:
+
+        print(
+            "DATABASE MIGRATION ERROR:",
+            str(e)
+        )
+
+        # Do not stop server completely.
+        # create_all() below can still create
+        # missing tables.
+
+
+
+# ============================================================
+# RUN DATABASE MIGRATION
+# ============================================================
+
+migrate_database()
+
+
+# ============================================================
 # CREATE TABLES
 # ============================================================
 
-model.Base.metadata.create_all(bind=engine)
+try:
+
+    model.Base.metadata.create_all(
+        bind=engine
+    )
+
+    print(
+        "DATABASE TABLES READY"
+    )
+
+except Exception as e:
+
+    print(
+        "DATABASE TABLE CREATION ERROR:",
+        str(e)
+    )
 
 
 # ============================================================
@@ -60,18 +256,24 @@ password_hash = PasswordHash.recommended()
 
 
 def hash_password(password: str):
+
     return password_hash.hash(password)
 
 
-def verify_password(password: str, hashed_password: str):
+def verify_password(
+    password: str,
+    hashed_password: str
+):
 
     try:
+
         return password_hash.verify(
             password,
             hashed_password
         )
 
     except Exception:
+
         return False
 
 
@@ -91,7 +293,9 @@ if GEMINI_API_KEY:
             api_key=GEMINI_API_KEY
         )
 
-        print("Gemini API loaded: True")
+        print(
+            "Gemini API loaded: True"
+        )
 
     except Exception as e:
 
@@ -102,7 +306,9 @@ if GEMINI_API_KEY:
 
 else:
 
-    print("Gemini API loaded: False")
+    print(
+        "Gemini API loaded: False"
+    )
 
 
 # ============================================================
@@ -1410,6 +1616,7 @@ def admin_user_details(
                 "target": h.target,
 
                 "status": h.status
+
             }
 
             for h in habits
@@ -1431,6 +1638,7 @@ def admin_user_details(
                     l.duration
                     if l.duration is not None
                     else 0
+
             }
 
             for l in logs
