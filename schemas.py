@@ -1,34 +1,24 @@
-from datetime import date
+from pydantic import BaseModel
 from typing import Optional
-
-from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 # ============================================================
-# USER
+# USER SCHEMAS
 # ============================================================
 
 class UserCreate(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     password: str
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: EmailStr
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # ============================================================
-# HABIT
+# HABIT SCHEMAS
 # ============================================================
 
 class HabitCreate(BaseModel):
@@ -45,35 +35,34 @@ class HabitUpdate(BaseModel):
     status: Optional[str] = None
 
 
-class HabitResponse(BaseModel):
-    id: int
-    name: str
-    category: str
-    target: str
-    status: str
-    user_id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # ============================================================
-# HABIT LOG
+# HABIT LOG SCHEMA
 # ============================================================
 
 class HabitLogCreate(BaseModel):
     user_id: int
     habit_id: int
-    date: date
+    date: str
     status: str
     duration: Optional[int] = 0
 
 
-class HabitLogResponse(BaseModel):
-    id: int
-    user_id: int
-    habit_id: int
-    date: date
-    status: str
-    duration: Optional[int] = 0
+# ============================================================
+# AI ADVICE SCHEMA
+# ============================================================
 
-    model_config = ConfigDict(from_attributes=True)
+class AIAdviceRequest(BaseModel):
+    user_id: Optional[int] = None
+    habit_id: Optional[int] = None
+    question: Optional[str] = None
+
+
+# ============================================================
+# AI PREDICTION SCHEMA
+# ============================================================
+
+class PredictionRequest(BaseModel):
+    completion_rate: float
+    missed_days: int
+    current_streak: int
+    frequency: int
