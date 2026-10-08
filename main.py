@@ -73,7 +73,8 @@ def sync_user_to_sqlite(user):
         user.id,
         user.name,
         user.email,
-        "[stored in MySQL]"
+                user.password
+                
     ))
 
     conn.commit()
