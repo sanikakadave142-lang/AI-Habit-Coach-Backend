@@ -1,4 +1,3 @@
-
 import os
 import secrets
 import time
@@ -10,14 +9,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 # ============================================================
 # SQLITE DEMO DATABASE
 # ============================================================
 
-SQLITE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "habit.db")
+SQLITE_DB = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "habit.db"
+)
+
 
 def sqlite_connection():
     return sqlite3.connect(SQLITE_DB)
+
 
 def create_sqlite_tables():
     conn = sqlite_connection()
@@ -61,7 +66,9 @@ def create_sqlite_tables():
 
 
 def sync_user_to_sqlite(user):
+
     create_sqlite_tables()
+
     conn = sqlite_connection()
     cur = conn.cursor()
 
@@ -81,7 +88,9 @@ def sync_user_to_sqlite(user):
 
 
 def sync_habit_to_sqlite(habit):
+
     create_sqlite_tables()
+
     conn = sqlite_connection()
     cur = conn.cursor()
 
@@ -103,6 +112,7 @@ def sync_habit_to_sqlite(habit):
 
 
 def ensure_sqlite_tables():
+
     conn = sqlite_connection()
     cur = conn.cursor()
 
@@ -140,45 +150,101 @@ def ensure_sqlite_tables():
     """)
 
     cur.execute("PRAGMA table_info(habit_logs)")
-    columns = {row[1] for row in cur.fetchall()}
 
-    if "date" not in columns:
-        cur.execute("ALTER TABLE habit_logs ADD COLUMN date TEXT")
+    columns = {
+        row[1]
+        for row in cur.fetchall()
+    }
+
+    if "user_id" not in columns:
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN user_id INTEGER"
+        )
+
+    if "habit_id" not in columns:
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN habit_id INTEGER"
+        )
 
     if "log_date" not in columns:
-        cur.execute("ALTER TABLE habit_logs ADD COLUMN log_date TEXT")
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN log_date TEXT"
+        )
+
+    if "status" not in columns:
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN status TEXT"
+        )
+
+    if "duration" not in columns:
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN duration INTEGER DEFAULT 0"
+        )
 
     if "note" not in columns:
-        cur.execute("ALTER TABLE habit_logs ADD COLUMN note TEXT")
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN note TEXT"
+        )
+
+    if "date" not in columns:
+        cur.execute(
+            "ALTER TABLE habit_logs ADD COLUMN date TEXT"
+        )
 
     conn.commit()
     conn.close()
 
 
 def sync_log_to_sqlite(log):
+
     ensure_sqlite_tables()
+
     conn = sqlite_connection()
     cur = conn.cursor()
 
-    log_date_value = getattr(log, "log_date", None)
-    date_value = getattr(log, "date", None)
+    log_date_value = getattr(
+        log,
+        "log_date",
+        None
+    )
+
+    date_value = getattr(
+        log,
+        "date",
+        None
+    )
 
     if log_date_value is None:
         log_date_value = date_value
 
     cur.execute("""
         INSERT OR REPLACE INTO habit_logs
-        (id, user_id, habit_id, log_date, status, duration, note, date)
+        (
+            id,
+            user_id,
+            habit_id,
+            log_date,
+            status,
+            duration,
+            note,
+            date
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         log.id,
         log.user_id,
         log.habit_id,
-        str(log_date_value) if log_date_value is not None else "",
+        str(log_date_value)
+        if log_date_value is not None
+        else "",
         log.status,
-        log.duration if log.duration is not None else 0,
+        log.duration
+        if log.duration is not None
+        else 0,
         getattr(log, "note", "") or "",
-        str(date_value) if date_value is not None else ""
+        str(date_value)
+        if date_value is not None
+        else ""
     ))
 
     conn.commit()
@@ -186,28 +252,37 @@ def sync_log_to_sqlite(log):
 
 
 def sync_all_to_sqlite():
-    """Mirror all current MySQL data into the local SQLite demo database."""
+
     conn = None
     db = None
 
     try:
-        create_sqlite_tables()
 
-        # SessionLocal and model are imported below this block,
-        # but this function is called only after those imports exist.
+        ensure_sqlite_tables()
+
         db = SessionLocal()
-        users = db.query(model.User).all()
-        habits = db.query(model.Habit).all()
-        logs = db.query(model.HabitLog).all()
+
+        users = db.query(
+            model.User
+        ).all()
+
+        habits = db.query(
+            model.Habit
+        ).all()
+
+        logs = db.query(
+            model.HabitLog
+        ).all()
 
         conn = sqlite_connection()
         cur = conn.cursor()
 
-        # Rebuild the mirror so deleted MySQL records do not remain in SQLite.
         cur.execute("DELETE FROM users")
         cur.execute("DELETE FROM habits")
         cur.execute("DELETE FROM habit_logs")
+
         conn.commit()
+
         conn.close()
         conn = None
 
@@ -221,16 +296,24 @@ def sync_all_to_sqlite():
             sync_log_to_sqlite(log)
 
         print(
-            f"SQLite sync completed: {len(users)} users, "
-            f"{len(habits)} habits, {len(logs)} habit logs"
+            f"SQLite sync completed: "
+            f"{len(users)} users, "
+            f"{len(habits)} habits, "
+            f"{len(logs)} habit logs"
         )
 
     except Exception as e:
-        print("SQLite sync error:", str(e))
+
+        print(
+            "SQLite sync error:",
+            str(e)
+        )
 
     finally:
+
         if conn is not None:
             conn.close()
+
         if db is not None:
             db.close()
 
@@ -239,9 +322,17 @@ def sync_all_to_sqlite():
 # ENVIRONMENT VARIABLES
 # ============================================================
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY"
+)
+
+ADMIN_EMAIL = os.getenv(
+    "ADMIN_EMAIL"
+)
+
+ADMIN_PASSWORD = os.getenv(
+    "ADMIN_PASSWORD"
+)
 
 
 # ============================================================
@@ -255,7 +346,9 @@ from fastapi import (
     Header
 )
 
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import (
+    CORSMiddleware
+)
 
 
 # ============================================================
@@ -263,10 +356,13 @@ from fastapi.middleware.cors import CORSMiddleware
 # ============================================================
 
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 
-from database import SessionLocal, engine
+from database import (
+    SessionLocal,
+    engine
+)
+
 import model
 import schemas
 
@@ -276,45 +372,150 @@ import schemas
 # ============================================================
 
 def migrate_database():
+
     try:
-        print("Checking SQLite database migration...")
+
+        print(
+            "Checking SQLite database migration..."
+        )
 
         with engine.begin() as conn:
-            result = conn.execute(text("""
-                SELECT name
-                FROM sqlite_master
-                WHERE type = 'table' AND name = 'habit_logs'
-            """))
+
+            result = conn.execute(
+                text("""
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table'
+                    AND name = 'habit_logs'
+                """)
+            )
 
             table_exists = result.fetchone()
 
+            # ------------------------------------------------
+            # CREATE TABLE IF NOT EXISTS
+            # ------------------------------------------------
+
             if not table_exists:
-                print("habit_logs table not found. Creating database tables...")
-                model.Base.metadata.create_all(bind=engine)
+
+                print(
+                    "Creating habit_logs table..."
+                )
+
+                conn.execute(
+                    text("""
+                        CREATE TABLE habit_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER,
+                            habit_id INTEGER,
+                            log_date TEXT,
+                            status TEXT,
+                            duration INTEGER DEFAULT 0,
+                            note TEXT,
+                            date TEXT
+                        )
+                    """)
+                )
+
+                print(
+                    "habit_logs table created successfully"
+                )
+
+            # ------------------------------------------------
+            # CHECK EXISTING TABLE
+            # ------------------------------------------------
+
             else:
-                result = conn.execute(text("PRAGMA table_info(habit_logs)"))
-                columns = {row[1] for row in result.fetchall()}
-                print("Existing habit_logs columns:", columns)
+
+                result = conn.execute(
+                    text(
+                        "PRAGMA table_info(habit_logs)"
+                    )
+                )
+
+                columns = {
+                    row[1]
+                    for row in result.fetchall()
+                }
+
+                print(
+                    "Existing habit_logs columns:",
+                    columns
+                )
 
                 if "user_id" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN user_id INTEGER DEFAULT 1"))
-                if "habit_id" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN habit_id INTEGER DEFAULT 1"))
-                if "date" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN date TEXT"))
-                if "log_date" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN log_date TEXT"))
-                if "status" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN status TEXT DEFAULT 'Pending'"))
-                if "duration" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN duration INTEGER DEFAULT 0"))
-                if "note" not in columns:
-                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN note TEXT"))
 
-        print("DATABASE MIGRATION COMPLETED")
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN user_id INTEGER
+                        """)
+                    )
+
+                if "habit_id" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN habit_id INTEGER
+                        """)
+                    )
+
+                if "log_date" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN log_date TEXT
+                        """)
+                    )
+
+                if "status" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN status TEXT
+                        """)
+                    )
+
+                if "duration" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN duration INTEGER DEFAULT 0
+                        """)
+                    )
+
+                if "note" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN note TEXT
+                        """)
+                    )
+
+                if "date" not in columns:
+
+                    conn.execute(
+                        text("""
+                            ALTER TABLE habit_logs
+                            ADD COLUMN date TEXT
+                        """)
+                    )
+
+        print(
+            "DATABASE MIGRATION COMPLETED"
+        )
 
     except Exception as e:
-        print("DATABASE MIGRATION ERROR:", str(e))
+
+        print(
+            "DATABASE MIGRATION ERROR:",
+            str(e)
+        )
 
 
 # ============================================================
@@ -338,7 +539,6 @@ try:
         "DATABASE TABLES READY"
     )
 
-    # Create/update the local SQLite mirror with all existing MySQL data.
     sync_all_to_sqlite()
 
 except Exception as e:
@@ -360,7 +560,9 @@ password_hash = PasswordHash.recommended()
 
 def hash_password(password: str):
 
-    return password_hash.hash(password)
+    return password_hash.hash(
+        password
+    )
 
 
 def verify_password(
@@ -431,19 +633,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
 
-    allow_origins=[
-        "*"
-    ],
+    allow_origins=["*"],
 
     allow_credentials=False,
 
-    allow_methods=[
-        "*"
-    ],
+    allow_methods=["*"],
 
-    allow_headers=[
-        "*"
-    ],
+    allow_headers=["*"],
 )
 
 
@@ -526,7 +722,9 @@ def register(
 
         db.refresh(new_user)
 
-        sync_user_to_sqlite(new_user)
+        sync_user_to_sqlite(
+            new_user
+        )
 
         return {
             "success": True,
@@ -631,15 +829,10 @@ def add_habit(
             )
 
         new_habit = model.Habit(
-
             name=habit.name,
-
             category=habit.category,
-
             target=habit.target,
-
             status="Pending",
-
             user_id=habit.user_id
         )
 
@@ -649,7 +842,9 @@ def add_habit(
 
         db.refresh(new_habit)
 
-        sync_habit_to_sqlite(new_habit)
+        sync_habit_to_sqlite(
+            new_habit
+        )
 
         return {
             "success": True,
@@ -705,9 +900,7 @@ def get_habits(
 
         return {
             "success": True,
-
             "habits": [
-
                 {
                     "id": habit.id,
                     "name": habit.name,
@@ -716,7 +909,6 @@ def get_habits(
                     "status": habit.status,
                     "user_id": habit.user_id
                 }
-
                 for habit in habits
             ]
         }
@@ -761,26 +953,24 @@ def update_habit(
         )
 
     if habit_data.name is not None:
-
         habit.name = habit_data.name
 
     if habit_data.category is not None:
-
         habit.category = habit_data.category
 
     if habit_data.target is not None:
-
         habit.target = habit_data.target
 
     if habit_data.status is not None:
-
         habit.status = habit_data.status
 
     db.commit()
 
     db.refresh(habit)
 
-    sync_habit_to_sqlite(habit)
+    sync_habit_to_sqlite(
+        habit
+    )
 
     return {
         "success": True,
@@ -825,7 +1015,6 @@ def delete_habit(
 
     db.commit()
 
-    # Full sync removes the deleted habit and its old logs from the mirror.
     sync_all_to_sqlite()
 
     return {
@@ -843,23 +1032,37 @@ def add_habit_log(
     log: schemas.HabitLogCreate,
     db: Session = Depends(get_db)
 ):
-    try:
-        print("HABIT LOG REQUEST:", log.model_dump())
 
-        # Check user
+    try:
+
+        print(
+            "HABIT LOG REQUEST:",
+            log.model_dump()
+        )
+
+        # ------------------------------------------------
+        # CHECK USER
+        # ------------------------------------------------
+
         user = (
             db.query(model.User)
-            .filter(model.User.id == log.user_id)
+            .filter(
+                model.User.id == log.user_id
+            )
             .first()
         )
 
         if not user:
+
             raise HTTPException(
                 status_code=404,
                 detail="User not found"
             )
 
-        # Check habit
+        # ------------------------------------------------
+        # CHECK HABIT
+        # ------------------------------------------------
+
         habit = (
             db.query(model.Habit)
             .filter(
@@ -870,40 +1073,81 @@ def add_habit_log(
         )
 
         if not habit:
+
             raise HTTPException(
                 status_code=404,
                 detail="Habit not found for this user"
             )
 
-        # Convert date safely
-        log_date = str(log.date)
+        # ------------------------------------------------
+        # DATE
+        # ------------------------------------------------
 
-        # Insert directly into SQLite
+        log_date = str(
+            log.date
+        )
+
+        # ------------------------------------------------
+        # ENSURE TABLE AND COLUMNS EXIST
+        # ------------------------------------------------
+
+        ensure_sqlite_tables()
+
+        # ------------------------------------------------
+        # INSERT HABIT LOG
+        # ------------------------------------------------
+
         db.execute(
             text("""
                 INSERT INTO habit_logs
-                (user_id, habit_id, log_date, status, duration, note, date)
+                (
+                    user_id,
+                    habit_id,
+                    log_date,
+                    status,
+                    duration,
+                    note,
+                    date
+                )
                 VALUES
-                (:user_id, :habit_id, :log_date, :status, :duration, :note, :date)
+                (
+                    :user_id,
+                    :habit_id,
+                    :log_date,
+                    :status,
+                    :duration,
+                    :note,
+                    :date
+                )
             """),
             {
                 "user_id": log.user_id,
                 "habit_id": log.habit_id,
                 "log_date": log_date,
                 "status": log.status,
-                "duration": log.duration if log.duration is not None else 0,
+                "duration": (
+                    log.duration
+                    if log.duration is not None
+                    else 0
+                ),
                 "note": "",
                 "date": log_date
             }
         )
 
-        # Update habit status
+        # ------------------------------------------------
+        # UPDATE HABIT STATUS
+        # ------------------------------------------------
+
         if log.status.lower() == "completed":
+
             habit.status = "Completed"
 
         db.commit()
 
-        print("HABIT LOG SAVED SUCCESSFULLY")
+        print(
+            "HABIT LOG SAVED SUCCESSFULLY"
+        )
 
         return {
             "success": True,
@@ -913,17 +1157,26 @@ def add_habit_log(
                 "habit_id": log.habit_id,
                 "date": log_date,
                 "status": log.status,
-                "duration": log.duration if log.duration is not None else 0
+                "duration": (
+                    log.duration
+                    if log.duration is not None
+                    else 0
+                )
             }
         }
 
     except HTTPException:
+
         raise
 
     except Exception as e:
+
         db.rollback()
 
-        print("HABIT LOG DATABASE ERROR:", repr(e))
+        print(
+            "HABIT LOG DATABASE ERROR:",
+            repr(e)
+        )
 
         raise HTTPException(
             status_code=500,
@@ -955,30 +1208,20 @@ def get_habit_logs(
         )
 
         return {
-
             "success": True,
-
             "logs": [
-
                 {
-
                     "id": log.id,
-
                     "user_id": log.user_id,
-
                     "habit_id": log.habit_id,
-
                     "date": str(log.date),
-
                     "status": log.status,
-
                     "duration": (
                         log.duration
                         if log.duration is not None
                         else 0
                     )
                 }
-
                 for log in logs
             ]
         }
@@ -1019,17 +1262,18 @@ def get_progress(
     completed = sum(
         1
         for log in logs
-        if str(log.status).lower() == "completed"
+        if str(log.status).lower()
+        == "completed"
     )
 
     missed = sum(
         1
         for log in logs
-        if str(log.status).lower() == "missed"
+        if str(log.status).lower()
+        == "missed"
     )
 
     completion_percentage = (
-
         round(
             (
                 completed /
@@ -1037,23 +1281,16 @@ def get_progress(
             ) * 100,
             2
         )
-
         if total_logs > 0
-
         else 0
     )
 
     return {
-
         "success": True,
-
         "completed": completed,
-
         "total_logs": total_logs,
-
         "completion_percentage":
             completion_percentage,
-
         "missed": missed
     }
 
@@ -1062,7 +1299,9 @@ def get_progress(
 # AI FALLBACK
 # ============================================================
 
-def get_fallback_advice(question: str):
+def get_fallback_advice(
+    question: str
+):
 
     q = question.lower()
 
@@ -1142,7 +1381,9 @@ def get_fallback_advice(question: str):
 # AI ADVICE REQUEST
 # ============================================================
 
-class AIAdviceRequest(schemas.BaseModel):
+class AIAdviceRequest(
+    schemas.BaseModel
+):
 
     question: str
 
@@ -1186,25 +1427,27 @@ def ai_advice(
     if gemini_client is None:
 
         return {
-
             "success": True,
-
             "question": question,
-
             "advice": fallback,
-
             "user_id": request.user_id,
-
             "model": "fallback",
-
             "source": "Habit Coach"
         }
 
-    prompt = f"""You are an AI Habit Coach.
-Give short, practical, positive advice in simple language.
+    prompt = f"""
+You are an AI Habit Coach.
+
+Give short, practical, positive advice
+in simple language.
+
 Answer in 2-3 sentences.
-User question: {question}
-Do not give dangerous medical advice."""
+
+User question:
+{question}
+
+Do not give dangerous medical advice.
+"""
 
     for model_name in AI_MODELS:
 
@@ -1222,20 +1465,14 @@ Do not give dangerous medical advice."""
             if response and response.text:
 
                 return {
-
                     "success": True,
-
                     "question": question,
-
                     "advice":
                         response.text.strip(),
-
                     "user_id":
                         request.user_id,
-
                     "model":
                         model_name,
-
                     "source":
                         "Gemini AI"
                 }
@@ -1279,17 +1516,11 @@ Do not give dangerous medical advice."""
             continue
 
     return {
-
         "success": True,
-
         "question": question,
-
         "advice": fallback,
-
         "user_id": request.user_id,
-
         "model": "fallback",
-
         "source": "Habit Coach"
     }
 
@@ -1299,7 +1530,9 @@ Do not give dangerous medical advice."""
 # ============================================================
 
 @app.post("/ai/predict")
-def ai_predict(data: dict):
+def ai_predict(
+    data: dict
+):
 
     completion_rate = float(
         data.get(
@@ -1372,26 +1605,14 @@ def ai_predict(data: dict):
         )
 
     return {
-
         "success": True,
-
         "prediction": prediction,
-
         "confidence": confidence,
-
         "recommendation": recommendation,
-
-        "completion_rate":
-            completion_rate,
-
-        "missed_days":
-            missed_days,
-
-        "current_streak":
-            current_streak,
-
-        "frequency":
-            frequency
+        "completion_rate": completion_rate,
+        "missed_days": missed_days,
+        "current_streak": current_streak,
+        "frequency": frequency
     }
 
 
@@ -1400,11 +1621,17 @@ def ai_predict(data: dict):
 # ============================================================
 
 @app.post("/admin/login")
-def admin_login(data: dict):
+def admin_login(
+    data: dict
+):
 
-    email = data.get("email")
+    email = data.get(
+        "email"
+    )
 
-    password = data.get("password")
+    password = data.get(
+        "password"
+    )
 
     if (
         not ADMIN_EMAIL
@@ -1426,17 +1653,18 @@ def admin_login(data: dict):
             detail="Invalid admin credentials"
         )
 
-    token = secrets.token_hex(32)
+    token = secrets.token_hex(
+        32
+    )
 
-    ADMIN_TOKENS.add(token)
+    ADMIN_TOKENS.add(
+        token
+    )
 
     return {
-
         "success": True,
-
         "message":
             "Admin login successful",
-
         "token": token
     }
 
@@ -1445,7 +1673,9 @@ def admin_login(data: dict):
 # ADMIN TOKEN VERIFY
 # ============================================================
 
-def verify_admin_token(token: str):
+def verify_admin_token(
+    token: str
+):
 
     if not token:
 
@@ -1469,18 +1699,22 @@ def verify_admin_token(token: str):
 # ============================================================
 
 @app.post("/admin/logout")
-def admin_logout(data: dict):
+def admin_logout(
+    data: dict
+):
 
-    token = data.get("token")
+    token = data.get(
+        "token"
+    )
 
     if token in ADMIN_TOKENS:
 
-        ADMIN_TOKENS.remove(token)
+        ADMIN_TOKENS.remove(
+            token
+        )
 
     return {
-
         "success": True,
-
         "message":
             "Admin logout successful"
     }
@@ -1498,25 +1732,37 @@ def admin_stats(
         alias="X-Admin-Token"
     ),
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(
+        get_db
+    )
 ):
 
-    verify_admin_token(token)
+    verify_admin_token(
+        token
+    )
 
     users_count = (
-        db.query(model.User).count()
+        db.query(
+            model.User
+        ).count()
     )
 
     habits_count = (
-        db.query(model.Habit).count()
+        db.query(
+            model.Habit
+        ).count()
     )
 
     logs_count = (
-        db.query(model.HabitLog).count()
+        db.query(
+            model.HabitLog
+        ).count()
     )
 
     completed_count = (
-        db.query(model.HabitLog)
+        db.query(
+            model.HabitLog
+        )
         .filter(
             model.HabitLog.status
             == "Completed"
@@ -1525,20 +1771,11 @@ def admin_stats(
     )
 
     return {
-
         "success": True,
-
-        "users":
-            users_count,
-
-        "habits":
-            habits_count,
-
-        "habit_logs":
-            logs_count,
-
-        "completed":
-            completed_count
+        "users": users_count,
+        "habits": habits_count,
+        "habit_logs": logs_count,
+        "completed": completed_count
     }
 
 
@@ -1554,27 +1791,32 @@ def admin_users(
         alias="X-Admin-Token"
     ),
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(
+        get_db
+    )
 ):
 
-    # Check admin login
-    verify_admin_token(token)
+    verify_admin_token(
+        token
+    )
 
-    # Get all users
     users = (
-        db.query(model.User)
-        .all()
+        db.query(
+            model.User
+        ).all()
     )
 
     result = []
 
-    # Get habits for every user
     for user in users:
 
         habits = (
-            db.query(model.Habit)
+            db.query(
+                model.Habit
+            )
             .filter(
-                model.Habit.user_id == user.id
+                model.Habit.user_id
+                == user.id
             )
             .all()
         )
@@ -1591,15 +1833,10 @@ def admin_users(
 
                 {
                     "id": habit.id,
-
                     "name": habit.name,
-
                     "category": habit.category,
-
                     "target": habit.target,
-
                     "status": habit.status,
-
                     "user_id": habit.user_id
                 }
 
@@ -1608,11 +1845,10 @@ def admin_users(
         })
 
     return {
-
         "success": True,
-
         "users": result
     }
+
 
 # ============================================================
 # ADMIN DELETE USER
@@ -1620,44 +1856,70 @@ def admin_users(
 
 @app.delete("/admin/users/{user_id}")
 def admin_delete_user(
+
     user_id: int,
-    token: str = Header(None, alias="X-Admin-Token"),
-    db: Session = Depends(get_db)
+
+    token: str = Header(
+        None,
+        alias="X-Admin-Token"
+    ),
+
+    db: Session = Depends(
+        get_db
+    )
 ):
-    verify_admin_token(token)
+
+    verify_admin_token(
+        token
+    )
 
     user = (
-        db.query(model.User)
-        .filter(model.User.id == user_id)
+        db.query(
+            model.User
+        )
+        .filter(
+            model.User.id == user_id
+        )
         .first()
     )
 
     if not user:
+
         raise HTTPException(
             status_code=404,
             detail="User not found"
         )
 
-    # Delete the user's habit logs first
-    db.query(model.HabitLog).filter(
-        model.HabitLog.user_id == user_id
-    ).delete(synchronize_session=False)
+    db.query(
+        model.HabitLog
+    ).filter(
+        model.HabitLog.user_id
+        == user_id
+    ).delete(
+        synchronize_session=False
+    )
 
-    # Delete the user's habits
-    db.query(model.Habit).filter(
-        model.Habit.user_id == user_id
-    ).delete(synchronize_session=False)
+    db.query(
+        model.Habit
+    ).filter(
+        model.Habit.user_id
+        == user_id
+    ).delete(
+        synchronize_session=False
+    )
 
-    # Delete the user
-    db.delete(user)
+    db.delete(
+        user
+    )
+
     db.commit()
 
-    # Keep the local SQLite mirror synchronized
     sync_all_to_sqlite()
 
     return {
         "success": True,
-        "message": "User deleted successfully",
+        "message":
+            "User deleted successfully",
         "user_id": user_id
     }
 
@@ -1676,13 +1938,19 @@ def admin_user_details(
         alias="X-Admin-Token"
     ),
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(
+        get_db
+    )
 ):
 
-    verify_admin_token(token)
+    verify_admin_token(
+        token
+    )
 
     user = (
-        db.query(model.User)
+        db.query(
+            model.User
+        )
         .filter(
             model.User.id == user_id
         )
@@ -1697,17 +1965,23 @@ def admin_user_details(
         )
 
     habits = (
-        db.query(model.Habit)
+        db.query(
+            model.Habit
+        )
         .filter(
-            model.Habit.user_id == user_id
+            model.Habit.user_id
+            == user_id
         )
         .all()
     )
 
     logs = (
-        db.query(model.HabitLog)
+        db.query(
+            model.HabitLog
+        )
         .filter(
-            model.HabitLog.user_id == user_id
+            model.HabitLog.user_id
+            == user_id
         )
         .all()
     )
@@ -1717,28 +1991,19 @@ def admin_user_details(
         "success": True,
 
         "user": {
-
             "id": user.id,
-
             "name": user.name,
-
             "email": user.email
         },
 
         "habits": [
 
             {
-
                 "id": h.id,
-
                 "name": h.name,
-
                 "category": h.category,
-
                 "target": h.target,
-
                 "status": h.status
-
             }
 
             for h in habits
@@ -1747,20 +2012,14 @@ def admin_user_details(
         "logs": [
 
             {
-
                 "id": l.id,
-
                 "habit_id": l.habit_id,
-
                 "date": str(l.date),
-
                 "status": l.status,
-
                 "duration":
                     l.duration
                     if l.duration is not None
                     else 0
-
             }
 
             for l in logs
