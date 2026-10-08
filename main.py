@@ -843,37 +843,23 @@ def add_habit_log(
     log: schemas.HabitLogCreate,
     db: Session = Depends(get_db)
 ):
-
     try:
+        print("HABIT LOG REQUEST:", log.model_dump())
 
-        print(
-            "HABIT LOG REQUEST:",
-            log.model_dump()
-        )
-
-        # ----------------------------------------
-        # CHECK USER
-        # ----------------------------------------
-
+        # Check user
         user = (
             db.query(model.User)
-            .filter(
-                model.User.id == log.user_id
-            )
+            .filter(model.User.id == log.user_id)
             .first()
         )
 
         if not user:
-
             raise HTTPException(
                 status_code=404,
                 detail="User not found"
             )
 
-        # ----------------------------------------
-        # CHECK HABIT
-        # ----------------------------------------
-
+        # Check habit
         habit = (
             db.query(model.Habit)
             .filter(
@@ -884,112 +870,64 @@ def add_habit_log(
         )
 
         if not habit:
-
             raise HTTPException(
                 status_code=404,
                 detail="Habit not found for this user"
             )
 
-        # ----------------------------------------
-        # CREATE LOG
-        # ----------------------------------------
+        # Convert date safely
+        log_date = str(log.date)
 
-        new_log = model.HabitLog(
-
-            user_id=log.user_id,
-
-            habit_id=log.habit_id,
-
-            date=log.date,
-
-            status=log.status,
-
-            duration=(
-                log.duration
-                if log.duration is not None
-                else 0
-            )
+        # Insert directly into SQLite
+        db.execute(
+            text("""
+                INSERT INTO habit_logs
+                (user_id, habit_id, log_date, status, duration, note, date)
+                VALUES
+                (:user_id, :habit_id, :log_date, :status, :duration, :note, :date)
+            """),
+            {
+                "user_id": log.user_id,
+                "habit_id": log.habit_id,
+                "log_date": log_date,
+                "status": log.status,
+                "duration": log.duration if log.duration is not None else 0,
+                "note": "",
+                "date": log_date
+            }
         )
 
-        db.add(new_log)
+        # Update habit status
+        if log.status.lower() == "completed":
+            habit.status = "Completed"
 
         db.commit()
 
-        db.refresh(new_log)
-
-        # ----------------------------------------
-        # UPDATE HABIT STATUS
-        # ----------------------------------------
-
-        if log.status.lower() == "completed":
-
-            habit.status = "Completed"
-
-            db.commit()
-
-        # SQLite is only a mirror/demo database.
-        # Do not run a full sync during a user habit-log request.
-
-        # ----------------------------------------
-        # RESPONSE
-        # ----------------------------------------
+        print("HABIT LOG SAVED SUCCESSFULLY")
 
         return {
-
             "success": True,
-
             "message": "Habit log added successfully",
-
             "log": {
-
-                "id": new_log.id,
-
-                "user_id": new_log.user_id,
-
-                "habit_id": new_log.habit_id,
-
-                "date": str(new_log.date),
-
-                "status": new_log.status,
-
-                "duration": (
-                    new_log.duration
-                    if new_log.duration is not None
-                    else 0
-                )
+                "user_id": log.user_id,
+                "habit_id": log.habit_id,
+                "date": log_date,
+                "status": log.status,
+                "duration": log.duration if log.duration is not None else 0
             }
         }
 
     except HTTPException:
-
         raise
 
-    except SQLAlchemyError as e:
-
+    except Exception as e:
         db.rollback()
 
-        print(
-            "HABIT LOG DATABASE ERROR:",
-            str(e)
-        )
+        print("HABIT LOG DATABASE ERROR:", repr(e))
 
         raise HTTPException(
             status_code=500,
             detail="Database error while saving habit log"
-        )
-
-    except Exception as e:
-
-        db.rollback()
-
-        print(
-            "HABIT LOG ERROR:",
-            str(e)
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to save habit log"
         )
 
 
