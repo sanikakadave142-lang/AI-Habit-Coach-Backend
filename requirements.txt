@@ -8,3 +8,9 @@ email-validator
 google-genai
 scikit-learn
 argon2-cffi
+chromadb==1.5.9
+langchain==1.4.3
+langchain-community==0.4.2
+langchain-core==1.6.7
+langchain-google-genai==4.4.0
+langchain-text-splitters==1.1.3
