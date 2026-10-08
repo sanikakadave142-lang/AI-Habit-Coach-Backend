@@ -73,8 +73,7 @@ def sync_user_to_sqlite(user):
         user.id,
         user.name,
         user.email,
-                user.password
-
+        "[stored in MySQL]"
     ))
 
     conn.commit()
@@ -277,171 +276,45 @@ import schemas
 # ============================================================
 
 def migrate_database():
-
     try:
-
-        print("Checking database migration...")
+        print("Checking SQLite database migration...")
 
         with engine.begin() as conn:
+            result = conn.execute(text("""
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'habit_logs'
+            """))
 
-            # ------------------------------------------------
-            # Check whether habit_logs table exists
-            # ------------------------------------------------
-
-            table_result = conn.execute(
-                text("SHOW TABLES LIKE 'habit_logs'")
-            )
-
-            table_exists = table_result.fetchone()
-
-            # ------------------------------------------------
-            # If table does not exist, create tables first
-            # ------------------------------------------------
+            table_exists = result.fetchone()
 
             if not table_exists:
-
-                print(
-                    "habit_logs table not found. "
-                    "Creating database tables..."
-                )
-
-                model.Base.metadata.create_all(
-                    bind=engine
-                )
-
+                print("habit_logs table not found. Creating database tables...")
+                model.Base.metadata.create_all(bind=engine)
             else:
-
-                # --------------------------------------------
-                # Get existing columns
-                # --------------------------------------------
-
-                result = conn.execute(
-                    text("SHOW COLUMNS FROM habit_logs")
-                )
-
-                columns = {
-                    row[0]
-                    for row in result.fetchall()
-                }
-
-                print(
-                    "Existing habit_logs columns:",
-                    columns
-                )
-
-                # --------------------------------------------
-                # Add user_id if missing
-                # --------------------------------------------
+                result = conn.execute(text("PRAGMA table_info(habit_logs)"))
+                columns = {row[1] for row in result.fetchall()}
+                print("Existing habit_logs columns:", columns)
 
                 if "user_id" not in columns:
-
-                    print(
-                        "Adding missing column: user_id"
-                    )
-
-                    conn.execute(
-                        text(
-                            """
-                            ALTER TABLE habit_logs
-                            ADD COLUMN user_id INT NOT NULL DEFAULT 1
-                            """
-                        )
-                    )
-
-                # --------------------------------------------
-                # Add habit_id if missing
-                # --------------------------------------------
-
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN user_id INTEGER DEFAULT 1"))
                 if "habit_id" not in columns:
-
-                    print(
-                        "Adding missing column: habit_id"
-                    )
-
-                    conn.execute(
-                        text(
-                            """
-                            ALTER TABLE habit_logs
-                            ADD COLUMN habit_id INT NOT NULL DEFAULT 1
-                            """
-                        )
-                    )
-
-                # --------------------------------------------
-                # Add date if missing
-                # --------------------------------------------
-
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN habit_id INTEGER DEFAULT 1"))
                 if "date" not in columns:
-
-                    print(
-                        "Adding missing column: date"
-                    )
-
-                    conn.execute(
-                        text(
-                            """
-                            ALTER TABLE habit_logs
-                            ADD COLUMN date DATE NOT NULL
-                            DEFAULT '2026-01-01'
-                            """
-                        )
-                    )
-
-                # --------------------------------------------
-                # Add status if missing
-                # --------------------------------------------
-
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN date TEXT"))
+                if "log_date" not in columns:
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN log_date TEXT"))
                 if "status" not in columns:
-
-                    print(
-                        "Adding missing column: status"
-                    )
-
-                    conn.execute(
-                        text(
-                            """
-                            ALTER TABLE habit_logs
-                            ADD COLUMN status VARCHAR(50)
-                            NOT NULL DEFAULT 'Pending'
-                            """
-                        )
-                    )
-
-                # --------------------------------------------
-                # Add duration if missing
-                # --------------------------------------------
-
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN status TEXT DEFAULT 'Pending'"))
                 if "duration" not in columns:
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN duration INTEGER DEFAULT 0"))
+                if "note" not in columns:
+                    conn.execute(text("ALTER TABLE habit_logs ADD COLUMN note TEXT"))
 
-                    print(
-                        "Adding missing column: duration"
-                    )
-
-                    conn.execute(
-                        text(
-                            """
-                            ALTER TABLE habit_logs
-                            ADD COLUMN duration INT
-                            DEFAULT 0
-                            """
-                        )
-                    )
-
-        print(
-            "DATABASE MIGRATION COMPLETED"
-        )
+        print("DATABASE MIGRATION COMPLETED")
 
     except Exception as e:
-
-        print(
-            "DATABASE MIGRATION ERROR:",
-            str(e)
-        )
-
-        # Do not stop server completely.
-        # create_all() below can still create
-        # missing tables.
-
+        print("DATABASE MIGRATION ERROR:", str(e))
 
 
 # ============================================================
@@ -1054,7 +927,8 @@ def add_habit_log(
 
             db.commit()
 
-        sync_all_to_sqlite()
+        # SQLite is only a mirror/demo database.
+        # Do not run a full sync during a user habit-log request.
 
         # ----------------------------------------
         # RESPONSE
@@ -1340,12 +1214,17 @@ class AIAdviceRequest(schemas.BaseModel):
 # ============================================================
 # GEMINI MODELS
 # ============================================================
+
 AI_MODELS = [
-    "gemini-3.8-flash"
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash"
 ]
 
+
 # ============================================================
-# FAST AI ADVICE
+# AI ADVICE
 # ============================================================
 
 @app.post("/ai/advice")
@@ -1356,74 +1235,123 @@ def ai_advice(
     question = request.question.strip()
 
     if not question:
+
         raise HTTPException(
             status_code=400,
             detail="Question is required"
         )
 
-    # Fast local fallback
-    fallback = get_fallback_advice(question)
+    fallback = get_fallback_advice(
+        question
+    )
 
-    # If Gemini is not available
     if gemini_client is None:
+
         return {
+
             "success": True,
+
             "question": question,
+
             "advice": fallback,
+
             "user_id": request.user_id,
+
             "model": "fallback",
+
             "source": "Habit Coach"
         }
 
-    # Short prompt for faster response
-    prompt = f"""
-You are an AI Habit Coach.
+    prompt = f"""You are an AI Habit Coach.
+Give short, practical, positive advice in simple language.
+Answer in 2-3 sentences.
+User question: {question}
+Do not give dangerous medical advice."""
 
-User question:
-{question}
+    for model_name in AI_MODELS:
 
-Give practical, simple and positive advice.
+        try:
 
-Rules:
-- Maximum 3 short sentences.
-- Give actionable suggestions.
-- Use simple language.
-- Stay focused on the question.
-- Do not give dangerous medical advice.
-"""
+            response = (
+                gemini_client
+                .models
+                .generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+            )
 
-    try:
+            if response and response.text:
 
-        response = gemini_client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt
-        )
+                return {
 
-        if response and response.text:
+                    "success": True,
 
-            return {
-                "success": True,
-                "question": question,
-                "advice": response.text.strip(),
-                "user_id": request.user_id,
-                "model": "gemini-3.8-flash",
-                "source": "Gemini AI"
-            }
+                    "question": question,
 
-    except Exception as e:
+                    "advice":
+                        response.text.strip(),
 
-        print(
-            "Gemini AI error:",
-            str(e)
-        )
+                    "user_id":
+                        request.user_id,
 
-    # Fast fallback if Gemini fails
+                    "model":
+                        model_name,
+
+                    "source":
+                        "Gemini AI"
+                }
+
+        except Exception as e:
+
+            error_text = str(e).lower()
+
+            print(
+                f"Gemini error "
+                f"({model_name}):",
+                str(e)
+            )
+
+            if any(
+                word in error_text
+                for word in [
+                    "429",
+                    "quota",
+                    "resource_exhausted",
+                    "rate limit"
+                ]
+            ):
+
+                break
+
+            if any(
+                word in error_text
+                for word in [
+                    "503",
+                    "unavailable",
+                    "overloaded",
+                    "high demand"
+                ]
+            ):
+
+                time.sleep(1)
+
+                continue
+
+            continue
+
     return {
+
         "success": True,
+
         "question": question,
+
         "advice": fallback,
+
         "user_id": request.user_id,
+
         "model": "fallback",
+
         "source": "Habit Coach"
     }
 
@@ -1754,58 +1682,44 @@ def admin_users(
 
 @app.delete("/admin/users/{user_id}")
 def admin_delete_user(
-
     user_id: int,
-
-    token: str = Header(
-        None,
-        alias="X-Admin-Token"
-    ),
-
+    token: str = Header(None, alias="X-Admin-Token"),
     db: Session = Depends(get_db)
 ):
-
     verify_admin_token(token)
 
     user = (
         db.query(model.User)
-        .filter(
-            model.User.id == user_id
-        )
+        .filter(model.User.id == user_id)
         .first()
     )
 
     if not user:
-
         raise HTTPException(
             status_code=404,
             detail="User not found"
         )
 
-    # Delete user's habit logs first
+    # Delete the user's habit logs first
     db.query(model.HabitLog).filter(
         model.HabitLog.user_id == user_id
     ).delete(synchronize_session=False)
 
-    # Delete user's habits
+    # Delete the user's habits
     db.query(model.Habit).filter(
         model.Habit.user_id == user_id
     ).delete(synchronize_session=False)
 
-    # Delete user
+    # Delete the user
     db.delete(user)
-
     db.commit()
 
-    # Update SQLite mirror
+    # Keep the local SQLite mirror synchronized
     sync_all_to_sqlite()
 
     return {
-
         "success": True,
-
         "message": "User deleted successfully",
-
         "user_id": user_id
     }
 
