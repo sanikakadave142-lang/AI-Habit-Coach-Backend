@@ -1817,6 +1817,68 @@ def admin_users(
     }
 
 # ============================================================
+# ADMIN DELETE USER
+# ============================================================
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(
+
+    user_id: int,
+
+    token: str = Header(
+        None,
+        alias="X-Admin-Token"
+    ),
+
+    db: Session = Depends(get_db)
+):
+
+    verify_admin_token(token)
+
+    user = (
+        db.query(model.User)
+        .filter(
+            model.User.id == user_id
+        )
+        .first()
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Delete user's habit logs first
+    db.query(model.HabitLog).filter(
+        model.HabitLog.user_id == user_id
+    ).delete(synchronize_session=False)
+
+    # Delete user's habits
+    db.query(model.Habit).filter(
+        model.Habit.user_id == user_id
+    ).delete(synchronize_session=False)
+
+    # Delete user
+    db.delete(user)
+
+    db.commit()
+
+    # Update SQLite mirror
+    sync_all_to_sqlite()
+
+    return {
+
+        "success": True,
+
+        "message": "User deleted successfully",
+
+        "user_id": user_id
+    }
+
+
+# ============================================================
 # ADMIN USER DETAILS
 # ============================================================
 
