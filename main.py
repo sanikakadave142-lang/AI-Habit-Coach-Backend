@@ -74,7 +74,7 @@ def sync_user_to_sqlite(user):
         user.name,
         user.email,
                 user.password
-                
+
     ))
 
     conn.commit()
@@ -1340,17 +1340,12 @@ class AIAdviceRequest(schemas.BaseModel):
 # ============================================================
 # GEMINI MODELS
 # ============================================================
-
 AI_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash"
+    "gemini-3.8-flash"
 ]
 
-
 # ============================================================
-# AI ADVICE
+# FAST AI ADVICE
 # ============================================================
 
 @app.post("/ai/advice")
@@ -1361,138 +1356,74 @@ def ai_advice(
     question = request.question.strip()
 
     if not question:
-
         raise HTTPException(
             status_code=400,
             detail="Question is required"
         )
 
-    fallback = get_fallback_advice(
-        question
-    )
+    # Fast local fallback
+    fallback = get_fallback_advice(question)
 
+    # If Gemini is not available
     if gemini_client is None:
-
         return {
-
             "success": True,
-
             "question": question,
-
             "advice": fallback,
-
             "user_id": request.user_id,
-
             "model": "fallback",
-
             "source": "Habit Coach"
         }
 
-    try:
-        knowledge = search_knowledge(question)
-    except Exception as e:
-        print("RAG error:", str(e))
-        knowledge = ""
-
+    # Short prompt for faster response
     prompt = f"""
 You are an AI Habit Coach.
-
-Give practical, simple and positive advice.
 
 User question:
 {question}
 
+Give practical, simple and positive advice.
+
 Rules:
-- Keep the answer useful.
-- Use simple language.
+- Maximum 3 short sentences.
 - Give actionable suggestions.
+- Use simple language.
+- Stay focused on the question.
 - Do not give dangerous medical advice.
 """
 
-    for model_name in AI_MODELS:
+    try:
 
-        try:
+        response = gemini_client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt
+        )
 
-            response = (
-                gemini_client
-                .models
-                .generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-            )
+        if response and response.text:
 
-            if response and response.text:
+            return {
+                "success": True,
+                "question": question,
+                "advice": response.text.strip(),
+                "user_id": request.user_id,
+                "model": "gemini-3.8-flash",
+                "source": "Gemini AI"
+            }
 
-                return {
+    except Exception as e:
 
-                    "success": True,
+        print(
+            "Gemini AI error:",
+            str(e)
+        )
 
-                    "question": question,
-
-                    "advice":
-                        response.text.strip(),
-
-                    "user_id":
-                        request.user_id,
-
-                    "model":
-                        model_name,
-
-                    "source":
-                        "Gemini AI"
-                }
-
-        except Exception as e:
-
-            error_text = str(e).lower()
-
-            print(
-                f"Gemini error "
-                f"({model_name}):",
-                str(e)
-            )
-
-            if any(
-                word in error_text
-                for word in [
-                    "429",
-                    "quota",
-                    "resource_exhausted",
-                    "rate limit"
-                ]
-            ):
-
-                break
-
-            if any(
-                word in error_text
-                for word in [
-                    "503",
-                    "unavailable",
-                    "overloaded",
-                    "high demand"
-                ]
-            ):
-
-                time.sleep(1)
-
-                continue
-
-            continue
-
+    # Fast fallback if Gemini fails
     return {
-
         "success": True,
-
         "question": question,
-
         "advice": fallback,
-
         "user_id": request.user_id,
-
         "model": "fallback",
-
         "source": "Habit Coach"
     }
 
