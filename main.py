@@ -2,11 +2,237 @@
 import os
 import secrets
 import time
+import sqlite3
 from datetime import date
+from rag_engine import search_knowledge
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ============================================================
+# SQLITE DEMO DATABASE
+# ============================================================
+
+SQLITE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "habit.db")
+
+def sqlite_connection():
+    return sqlite3.connect(SQLITE_DB)
+
+def create_sqlite_tables():
+    conn = sqlite_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            password TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS habits (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            category TEXT,
+            target TEXT,
+            status TEXT,
+            user_id INTEGER
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS habit_logs (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            habit_id INTEGER,
+            log_date TEXT,
+            status TEXT,
+            duration INTEGER,
+            note TEXT,
+            date TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def sync_user_to_sqlite(user):
+    create_sqlite_tables()
+    conn = sqlite_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT OR REPLACE INTO users
+        (id, name, email, password)
+        VALUES (?, ?, ?, ?)
+    """, (
+        user.id,
+        user.name,
+        user.email,
+        "[stored in MySQL]"
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def sync_habit_to_sqlite(habit):
+    create_sqlite_tables()
+    conn = sqlite_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT OR REPLACE INTO habits
+        (id, name, category, target, status, user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        habit.id,
+        habit.name,
+        habit.category,
+        habit.target,
+        habit.status,
+        habit.user_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def ensure_sqlite_tables():
+    conn = sqlite_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            password TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS habits (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            category TEXT,
+            target TEXT,
+            status TEXT,
+            user_id INTEGER
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS habit_logs (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            habit_id INTEGER,
+            log_date TEXT,
+            status TEXT,
+            duration INTEGER,
+            note TEXT,
+            date TEXT
+        )
+    """)
+
+    cur.execute("PRAGMA table_info(habit_logs)")
+    columns = {row[1] for row in cur.fetchall()}
+
+    if "date" not in columns:
+        cur.execute("ALTER TABLE habit_logs ADD COLUMN date TEXT")
+
+    if "log_date" not in columns:
+        cur.execute("ALTER TABLE habit_logs ADD COLUMN log_date TEXT")
+
+    if "note" not in columns:
+        cur.execute("ALTER TABLE habit_logs ADD COLUMN note TEXT")
+
+    conn.commit()
+    conn.close()
+
+
+def sync_log_to_sqlite(log):
+    ensure_sqlite_tables()
+    conn = sqlite_connection()
+    cur = conn.cursor()
+
+    log_date_value = getattr(log, "log_date", None)
+    date_value = getattr(log, "date", None)
+
+    if log_date_value is None:
+        log_date_value = date_value
+
+    cur.execute("""
+        INSERT OR REPLACE INTO habit_logs
+        (id, user_id, habit_id, log_date, status, duration, note, date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        log.id,
+        log.user_id,
+        log.habit_id,
+        str(log_date_value) if log_date_value is not None else "",
+        log.status,
+        log.duration if log.duration is not None else 0,
+        getattr(log, "note", "") or "",
+        str(date_value) if date_value is not None else ""
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def sync_all_to_sqlite():
+    """Mirror all current MySQL data into the local SQLite demo database."""
+    conn = None
+    db = None
+
+    try:
+        create_sqlite_tables()
+
+        # SessionLocal and model are imported below this block,
+        # but this function is called only after those imports exist.
+        db = SessionLocal()
+        users = db.query(model.User).all()
+        habits = db.query(model.Habit).all()
+        logs = db.query(model.HabitLog).all()
+
+        conn = sqlite_connection()
+        cur = conn.cursor()
+
+        # Rebuild the mirror so deleted MySQL records do not remain in SQLite.
+        cur.execute("DELETE FROM users")
+        cur.execute("DELETE FROM habits")
+        cur.execute("DELETE FROM habit_logs")
+        conn.commit()
+        conn.close()
+        conn = None
+
+        for user in users:
+            sync_user_to_sqlite(user)
+
+        for habit in habits:
+            sync_habit_to_sqlite(habit)
+
+        for log in logs:
+            sync_log_to_sqlite(log)
+
+        print(
+            f"SQLite sync completed: {len(users)} users, "
+            f"{len(habits)} habits, {len(logs)} habit logs"
+        )
+
+    except Exception as e:
+        print("SQLite sync error:", str(e))
+
+    finally:
+        if conn is not None:
+            conn.close()
+        if db is not None:
+            db.close()
 
 
 # ============================================================
@@ -238,6 +464,9 @@ try:
         "DATABASE TABLES READY"
     )
 
+    # Create/update the local SQLite mirror with all existing MySQL data.
+    sync_all_to_sqlite()
+
 except Exception as e:
 
     print(
@@ -423,6 +652,8 @@ def register(
 
         db.refresh(new_user)
 
+        sync_user_to_sqlite(new_user)
+
         return {
             "success": True,
             "message": "Registration successful",
@@ -543,6 +774,8 @@ def add_habit(
         db.commit()
 
         db.refresh(new_habit)
+
+        sync_habit_to_sqlite(new_habit)
 
         return {
             "success": True,
@@ -673,6 +906,8 @@ def update_habit(
 
     db.refresh(habit)
 
+    sync_habit_to_sqlite(habit)
+
     return {
         "success": True,
         "message": "Habit updated successfully",
@@ -715,6 +950,9 @@ def delete_habit(
     db.delete(habit)
 
     db.commit()
+
+    # Full sync removes the deleted habit and its old logs from the mirror.
+    sync_all_to_sqlite()
 
     return {
         "success": True,
@@ -814,6 +1052,8 @@ def add_habit_log(
             habit.status = "Completed"
 
             db.commit()
+
+        sync_all_to_sqlite()
 
         # ----------------------------------------
         # RESPONSE
@@ -1146,6 +1386,12 @@ def ai_advice(
 
             "source": "Habit Coach"
         }
+
+    try:
+        knowledge = search_knowledge(question)
+    except Exception as e:
+        print("RAG error:", str(e))
+        knowledge = ""
 
     prompt = f"""
 You are an AI Habit Coach.
